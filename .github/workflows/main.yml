@@ -1,0 +1,33 @@
+name: Build TC HELICON by LR (Windows)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (CMake fetches JUCE)
+        run: cmake -B build
+
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: TC-HELICON-by-LR-Windows-VST3
+          path: build/HarmonySingerByLR_artefacts/Release/VST3/**
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: TC-HELICON-by-LR-Windows-Standalone
+          path: build/HarmonySingerByLR_artefacts/Release/Standalone/**
+          if-no-files-found: warn
