@@ -1,0 +1,199 @@
+{
+  "crop_offset_in_original": [
+    270,
+    110
+  ],
+  "background_size": [
+    680,
+    934
+  ],
+  "knobs": {
+    "harmony": {
+      "strip": "knobs/knob_harmony_8pos_strip.png",
+      "frames": 8,
+      "frame_size": [
+        200,
+        200
+      ],
+      "top_left": [
+        78,
+        169
+      ],
+      "center": [
+        178.5,
+        269.0
+      ],
+      "radius": 68,
+      "angles_deg_clockwise_from_up": [
+        212.1,
+        239.3,
+        303.3,
+        330.5,
+        29.5,
+        54.0,
+        116.7,
+        147.4
+      ],
+      "dot_positions": [
+        "BL",
+        "LD",
+        "LU",
+        "TL",
+        "TR",
+        "RU",
+        "RD",
+        "BR"
+      ]
+    },
+    "level": {
+      "strip": "knobs/knob_level_64f_strip.png",
+      "frames": 64,
+      "frame_size": [
+        200,
+        200
+      ],
+      "top_left": [
+        240,
+        171
+      ],
+      "center": [
+        340.0,
+        271.0
+      ],
+      "radius": 69,
+      "sweep": "frame 0 = minimum (kiri-bawah, 225 deg), frame 63 = maksimum (kanan-bawah, 135 deg)"
+    },
+    "reverb": {
+      "strip": "knobs/knob_reverb_4pos_strip.png",
+      "frames": 4,
+      "frame_size": [
+        200,
+        200
+      ],
+      "top_left": [
+        401,
+        169
+      ],
+      "center": [
+        501.0,
+        269.0
+      ],
+      "radius": 69,
+      "frame_order": [
+        "OFF",
+        "ROOM",
+        "CLUB",
+        "HALL"
+      ],
+      "angles_deg_clockwise_from_up": [
+        223.4,
+        313.4,
+        43.4,
+        133.4
+      ]
+    },
+    "mix_in_1L": {
+      "strip": "knobs/knob_mix_in_1L_64f_strip.png",
+      "frames": 64,
+      "frame_size": [
+        124,
+        124
+      ],
+      "top_left": [
+        410.0,
+        474.0
+      ],
+      "center": [
+        472.0,
+        536.0
+      ],
+      "radius": 43,
+      "sweep": "frame 0 = minimum, frame 63 = maksimum (sama seperti Level)"
+    }
+  },
+  "buttons": {
+    "footswitch": {
+      "file": "buttons/footswitch_up.png / footswitch_down.png",
+      "top_left": [
+        250,
+        747
+      ],
+      "size": [
+        168,
+        168
+      ],
+      "center": [
+        334.0,
+        831.0
+      ],
+      "hit_radius": 68
+    },
+    "ref_out": {
+      "file": "buttons/refout_switch_up.png / refout_switch_down.png",
+      "top_left": [
+        118,
+        380
+      ],
+      "size": [
+        100,
+        100
+      ],
+      "center": [
+        168.0,
+        430.0
+      ],
+      "hit_radius": 36
+    },
+    "tone": {
+      "file": "buttons/tone_button_led_(on|off)[_pressed].png",
+      "top_left": [
+        448,
+        369
+      ],
+      "size": [
+        104,
+        104
+      ],
+      "center": [
+        500.0,
+        421.0
+      ],
+      "hit_radius": 40
+    }
+  },
+  "leds": {
+    "led_status_fx": {
+      "file": "leds/led_status_red_(on|off).png",
+      "top_left": [
+        308,
+        500
+      ],
+      "size": [
+        64,
+        64
+      ],
+      "center": [
+        339.5,
+        532.5
+      ]
+    },
+    "led_power": {
+      "file": "leds/led_power_green_(on|off).png",
+      "top_left": [
+        508,
+        100
+      ],
+      "size": [
+        64,
+        64
+      ],
+      "center": [
+        539.5,
+        132.0
+      ]
+    },
+    "led_tone_red": {
+      "info": "LED merah TONE sudah menyatu di dalam tombol: pakai tone_button_led_on / tone_button_led_off"
+    }
+  }
+}
