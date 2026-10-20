@@ -45,7 +45,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     params.push_back (std::make_unique<juce::AudioParameterFloat> (
         juce::ParameterID { ParamIDs::mixInL, 1 }, "Mix In 1/L",
-        juce::NormalisableRange<float> (0.0f, 1.0f), 0.5f));
+        juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
 
     params.push_back (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamIDs::toneEnabled, 1 }, "Adaptive Tone", true));

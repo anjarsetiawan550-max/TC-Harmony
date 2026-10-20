@@ -12,13 +12,13 @@
         Input 2 (channel 1)  = reference/guitar   -> (gated by Ref Out) -> Output 2 / R only
 
     Signal flow on the vocal (L) side:
-        mic -> Adaptive Tone (optional) -> [analysed for pitch] -> HarmonyEngine
-             -> dry/harmony MIX (Mix In 1/L) -> Output L
+        mic -> Adaptive Tone (optional) -> [analysed for pitch] -> HarmonyEngine (PSOLA)
+             -> crossfade asli <-> harmoni (Mix In 1/L; 100% = tanpa suara asli) -> Output L
         (HarmonyEngine itself also listens to the reference input purely to
          estimate the song's key, never adding it to the audible signal.)
 
-    Latency: the plugin reports PDC equal to the pitch-shifter's grain
-    length (one analysis window, ~23 ms @ 44.1 kHz) so hosts keep the
+    Latency: the plugin reports PDC equal to the pitch-shifter's latency
+    (PsolaPitchShifter::getLatencySamples(), 1168 samples ~ 26 ms @ 44.1 kHz) so hosts keep the
     dry-mixed vocal, the harmony voices and the reference/R channel all
     sample-aligned. That window size is deliberately kept small (rather
     than a larger, higher-fidelity PSOLA/phase-vocoder window) to keep

@@ -71,29 +71,35 @@ Hasilnya ada di `build/HarmonySingerByLR_artefacts/Release/`.
 | **HARMONY** (8 posisi) | High / Higher / High & Higher / Low / Lower / Low & Lower / Higher & Lower / High & Low |
 | **LEVEL** | Volume keluaran suara harmoni |
 | **REVERB** (4 posisi) | Off / Room / Club / Hall |
-| **MIX IN 1/L** | Campuran suara asli (dry) vs hasil (dry + harmoni) di Output L |
+| **MIX IN 1/L** | Crossfade di Output L: 0% = hanya suara asli mic, **100% = hanya suara harmoni (tanpa suara asli / tanpa nada "DO")**. Default 100%. Footswitch OFF = bypass (suara asli saja) |
 | **TONE** (tombol + LED merah) | Nyala/mati **Adaptive Tone** (EQ adaptif + Kompresor + De-esser + Noise-gate) pada vokal asli, bukan suara harmoni |
 | **Footswitch** | Nyala/mati efek harmoni (bypass) |
-| **Ctrl + klik Footswitch** | Ganti voicing Tone: Normal ⇄ Less Bright |
-| **REF OUT** | Nyala = suara referensi terdengar di Output 2/R, mati = Output 2/R senyap |
+| **Ctrl + klik Footswitch** (Mac: Cmd + klik; atau **klik kanan**) | Ganti voicing Tone: Normal ⇄ Less Bright. Muncul pesan singkat "TONE: ..." di panel. Hanya terdengar kalau tombol TONE menyala |
+| **REF OUT** | Nyala = suara referensi terdengar di Output 2/R, mati = Output 2/R senyap. **LED amber** di kanan tulisan REF OUT ikut menyala/mati |
 
 ## Cara kerja singkat
 
 1. **YIN pitch detector** (jendela ~23 ms) membaca nada vokal kamu (dan,
-   terpisah, nada dari input referensi).
+   terpisah, nada dari input referensi). Nada yang dipegang penyanyi
+   dikunci dengan hysteresis, jadi vibrato tidak membuat interval harmoni
+   loncat antara mayor/minor.
 2. Nada dari input referensi dipakai untuk menaksir **kunci (key)** lagu
-   secara statistik (histogram pitch-class yang meluruh perlahan), supaya
+   secara statistik (histogram pitch-class yang meluruh perlahan; melodi
+   penyanyi ikut jadi bukti tambahan, jadi kunci tetap terbentuk walau
+   input 2 kosong), supaya
    interval harmoni (3/4/5/6) jatuh pada nada yang *diatonically correct*
    di kunci tersebut — bukan selalu interval kromatik tetap. Sebelum
    kunci "terbentuk" (data belum cukup), engine memakai interval
    kromatik standar (C mayor) sebagai fallback supaya efek tetap bisa
    langsung dipakai.
-3. **Granular pitch shifter** dua-grain (overlap-add, grain ~23 ms)
-   menggeser nada vokal sesuai interval yang dipilih mode HARMONY,
-   dengan latensi yang dilaporkan ke DAW (Plugin Delay Compensation)
-   supaya tetap presisi secara timing — jendela grain sengaja dibuat
-   pendek supaya terasa real-time saat bernyanyi live, dengan tetap
-   cukup panjang untuk pitch tracking yang stabil.
+3. **PSOLA pitch shifter** (pitch-synchronous overlap-add) menggeser
+   nada vokal sesuai interval mode HARMONY. Tiap grain = 2 periode nada
+   dan dikunci ke fase gelombang, lalu disusun ulang dengan jarak baru —
+   nada berubah tapi *formant* (warna vokal) tetap, jadi terdengar seperti
+   orang bernyanyi, bukan robot. Bagian tak-bernada (napas, "s", "t")
+   tidak digeser. Tiap suara harmoni punya detune halus yang melayang
+   pelan (+-6 sen +- 4) dan delay kecil (9 / 15 ms) seperti penyanyi
+   kedua. Latensi 1168 sampel (~26 ms @ 44.1 kHz) dilaporkan ke DAW (PDC).
 4. **Adaptive Tone** memproses vokal asli sebelum di-harmonisasi:
    Noise-gate → EQ adaptif → Compressor → De-esser.
 5. Reverb (Room/Club/Hall) diterapkan pada bus suara harmoni saja, lalu
@@ -108,10 +114,10 @@ Hasilnya ada di `build/HarmonySingerByLR_artefacts/Release/`.
   jadi build pertama yang benar-benar mengkompilasinya — kalau ada error
   kompilasi kecil (typo, perbedaan versi JUCE, dsb.), cek log di tab
   Actions dan laporkan ke saya baris errornya, saya bantu perbaiki.
-- Pitch shifter memakai teknik granular overlap-add (bukan PSOLA/phase
-  vocoder penuh) — ringan dan latensi rendah, cukup bagus untuk vokal
-  monofonik, tapi tidak se-halus algoritma pitch-shifting kelas studio
-  TC-Helicon asli.
+- Pitch shifter memakai PSOLA monofonik: sangat natural untuk interval
+  kecil-menengah (3/4/5/6), tapi tetap bukan algoritma studio berbayar;
+  pada nada yang sangat serak/bernapas atau deteksi pitch yang salah
+  oktaf, kualitasnya bisa turun.
 - Deteksi kunci dari input referensi mengasumsikan melodi/kunci mayor
   sederhana dan tidak mengenali akor kompleks — ini pengganti sederhana
   untuk fitur "guitar-controlled harmony" TC-Helicon yang sesungguhnya
@@ -134,7 +140,7 @@ Source/
   Params.h                      definisi parameter (APVTS)
   dsp/
     YinPitchDetector.*          deteksi pitch (YIN)
-    GranularPitchShifter.*      pitch shifter latensi-rendah
+    PsolaPitchShifter.*         pitch shifter PSOLA (formant terjaga)
     HarmonyEngine.*             mode harmoni, estimasi kunci, reverb
     AdaptiveTone.*              noise-gate, EQ, compressor, de-esser
   gui/

@@ -34,6 +34,12 @@ private:
     ImageStateButton footswitch;    // states: 0 up, 1 down
     ImageStateButton ledStatusFx;   // states: 0 off, 1 on
     ImageStateButton ledPower;      // states: 0 off, 1 on (we always show on)
+    ImageStateButton ledRefOut;     // states: 0 off, 1 on (mengikuti tombol REF OUT)
+
+    // pesan singkat di panel (mis. "TONE: LESS BRIGHT" setelah Ctrl + klik footswitch)
+    void showOverlay (const juce::String& text);
+    juce::String overlayText;
+    double overlayUntilMs = 0.0;
 
     bool toneButtonPressed = false;
 

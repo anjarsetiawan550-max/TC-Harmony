@@ -95,16 +95,27 @@ HarmonySingerAudioProcessorEditor::HarmonySingerAudioProcessorEditor (HarmonySin
     };
     addAndMakeVisible (refOutButton);
 
-    // --- Footswitch: click = harmony FX on/off, Ctrl+click = Tone voicing ---
+    // --- Footswitch: klik = harmony FX on/off.
+    //     Ctrl + klik (Mac: Cmd + klik) atau klik kanan = ganti voicing Tone Normal <-> Less Bright ---
     footswitch.addState (loadImg (BinaryData::footswitch_up_png,   BinaryData::footswitch_up_pngSize));   // 0 = up
     footswitch.addState (loadImg (BinaryData::footswitch_down_png, BinaryData::footswitch_down_pngSize)); // 1 = down (momentary)
     footswitch.onPressedStateChanged = [this] (bool down) { footswitch.setStateIndex (down ? 1 : 0); };
     footswitch.onClick = [this] (const juce::ModifierKeys& mods)
     {
-        if (mods.isCtrlDown())
+        if (mods.isCtrlDown() || mods.isCommandDown() || mods.isPopupMenu())
+        {
             processor.toggleToneVoicing();
+
+            const auto* voicingParam = processor.apvts.getParameter (ParamIDs::toneVoicing);
+            const bool lessBright = voicingParam != nullptr && voicingParam->getValue() > 0.5f;
+            const bool toneOn = *processor.apvts.getRawParameterValue (ParamIDs::toneEnabled) > 0.5f;
+            showOverlay (juce::String ("TONE: ") + (lessBright ? "LESS BRIGHT" : "NORMAL")
+                         + (toneOn ? "" : "  (tombol TONE mati)"));
+        }
         else
+        {
             processor.toggleFxEnabled();
+        }
         refreshToggleVisuals();
     };
     addAndMakeVisible (footswitch);
@@ -118,6 +129,11 @@ HarmonySingerAudioProcessorEditor::HarmonySingerAudioProcessorEditor (HarmonySin
     ledPower.addState (loadImg (BinaryData::led_power_green_on_png,  BinaryData::led_power_green_on_pngSize));  // 1
     ledPower.setStateIndex (1); // power LED is on whenever the plugin is loaded
     addAndMakeVisible (ledPower);
+
+    ledRefOut.addState (loadImg (BinaryData::led_refout_amber_off_png, BinaryData::led_refout_amber_off_pngSize)); // 0
+    ledRefOut.addState (loadImg (BinaryData::led_refout_amber_on_png,  BinaryData::led_refout_amber_on_pngSize));  // 1
+    ledRefOut.setInterceptsMouseClicks (false, false);
+    addAndMakeVisible (ledRefOut);
 
     refreshToggleVisuals();
 
@@ -154,6 +170,28 @@ void HarmonySingerAudioProcessorEditor::paint (juce::Graphics& g)
         g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
         g.drawImage (backgroundImage, getLocalBounds().toFloat());
     }
+
+    // pesan singkat (hilang sendiri setelah ~2 detik)
+    const double remaining = overlayUntilMs - juce::Time::getMillisecondCounterHiRes();
+    if (remaining > 0.0 && overlayText.isNotEmpty())
+    {
+        const float k = static_cast<float> (getWidth()) / static_cast<float> (PedalLayout::bgWidth);
+        const float alpha = juce::jlimit (0.0f, 1.0f, static_cast<float> (remaining / 400.0));
+        const juce::Rectangle<float> r (50.0f * k, 566.0f * k, 360.0f * k, 32.0f * k);
+
+        g.setColour (juce::Colours::black.withAlpha (0.60f * alpha));
+        g.fillRoundedRectangle (r, 8.0f * k);
+        g.setColour (juce::Colours::white.withAlpha (alpha));
+        g.setFont (juce::Font (14.0f * k, juce::Font::bold));
+        g.drawText (overlayText, r, juce::Justification::centred, false);
+    }
+}
+
+void HarmonySingerAudioProcessorEditor::showOverlay (const juce::String& text)
+{
+    overlayText = text;
+    overlayUntilMs = juce::Time::getMillisecondCounterHiRes() + 2000.0;
+    repaint();
 }
 
 void HarmonySingerAudioProcessorEditor::resized()
@@ -171,6 +209,7 @@ void HarmonySingerAudioProcessorEditor::resized()
 
     placeButton (ledStatusFx, PedalLayout::ledStatusFx, k);
     placeButton (ledPower,    PedalLayout::ledPower,    k);
+    placeButton (ledRefOut,   PedalLayout::ledRefOut,   k);
 
     // ingat ukuran terakhir (ikut tersimpan di state plugin / preset DAW)
     processor.apvts.state.setProperty ("uiScale", k, nullptr);
@@ -179,6 +218,13 @@ void HarmonySingerAudioProcessorEditor::resized()
 void HarmonySingerAudioProcessorEditor::timerCallback()
 {
     refreshToggleVisuals();
+
+    if (overlayUntilMs > 0.0)
+    {
+        repaint();
+        if (juce::Time::getMillisecondCounterHiRes() > overlayUntilMs)
+            overlayUntilMs = 0.0;
+    }
 }
 
 void HarmonySingerAudioProcessorEditor::refreshToggleVisuals()
@@ -191,4 +237,5 @@ void HarmonySingerAudioProcessorEditor::refreshToggleVisuals()
 
     const bool refOutOn = *processor.apvts.getRawParameterValue (ParamIDs::refOut) > 0.5f;
     refOutButton.setStateIndex (refOutOn ? 1 : 0);
+    ledRefOut.setStateIndex (refOutOn ? 1 : 0);   // LED REF OUT: menyala = output 2/R aktif
 }

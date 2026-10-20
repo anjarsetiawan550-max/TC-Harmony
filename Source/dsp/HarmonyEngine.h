@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "YinPitchDetector.h"
-#include "GranularPitchShifter.h"
+#include "PsolaPitchShifter.h"
 
 /**
     HarmonyEngine
@@ -57,12 +57,26 @@ public:
 
 private:
     void updateReverbParamsForType (int type);
-    void updateKeyEstimate (float referenceFreqHz, bool referenceVoiced);
-    float diatonicSemitoneOffset (float singerFreqHz, int scaleStepsOffset) const;
+    void updateKeyEstimate (float referenceFreqHz, bool referenceVoiced,
+                            float singerFreqHz, bool singerVoiced, int numSamples);
+    float diatonicSemitoneOffset (int singerMidiNote, int scaleStepsOffset) const;
 
     YinPitchDetector pitchDetector;    // tracks the singer (dry vocal)
     YinPitchDetector referencePitch;   // tracks the guitar/reference input
-    GranularPitchShifter voiceA, voiceB;
+    PsolaPitchShifter voiceA, voiceB;   // PSOLA: formant terjaga, tidak "robot"
+
+    double sampleRate = 44100.0;
+
+    // nada penyanyi yang sedang dipegang (dengan hysteresis supaya vibrato tidak
+    // membuat interval harmoni loncat-loncat antara mayor/minor)
+    int  trackedNote = 60;
+    bool noteValid = false;
+    float lastSemiA = 0.0f, lastSemiB = 0.0f; // offset terakhir; dipertahankan saat tak bernada
+
+    // "kemanusiaan": detune halus yang berfluktuasi pelan per suara
+    juce::Random rng { 12345 };
+    float driftA = 0.0f, driftB = 0.0f, driftTargetA = 0.0f, driftTargetB = 0.0f;
+    int   driftCounter = 0;
 
     bool voiceAActive = false;
     bool voiceBActive = false;

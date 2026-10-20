@@ -70,8 +70,9 @@ void AdaptiveTone::updateFilters()
     }
     else // LessBright
     {
-        *presence.coefficients = *juce::dsp::IIR::Coefficients<float>::makePeakFilter (sr, 2800.0f, 1.1f, juce::Decibels::decibelsToGain (1.5f));
-        *airShelf.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighShelf (sr, 9000.0f, 0.8f, juce::Decibels::decibelsToGain (-1.5f));
+        // jelas lebih gelap/lembut dari Normal (selisih ~8 dB di atas 5 kHz) supaya perubahan terdengar
+        *presence.coefficients = *juce::dsp::IIR::Coefficients<float>::makePeakFilter (sr, 2500.0f, 1.0f, juce::Decibels::decibelsToGain (0.0f));
+        *airShelf.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighShelf (sr, 5500.0f, 0.7f, juce::Decibels::decibelsToGain (-4.5f));
         deEssThreshold = 0.035f; // more sensitive -> catches sibilance earlier
         deEssFloor = 0.22f;      // allowed to cut harder
     }

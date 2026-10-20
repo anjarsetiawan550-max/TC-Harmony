@@ -42,8 +42,11 @@ public:
         }
     }
 
-    void mouseDown (const juce::MouseEvent&) override
+    void mouseDown (const juce::MouseEvent& e) override
     {
+        // Simpan modifier saat tombol mouse DITEKAN: kalau Ctrl sudah dilepas sebelum
+        // mouse dilepas (atau host tidak meneruskannya di mouseUp), Ctrl+klik tetap terbaca.
+        downMods = e.mods;
         if (onPressedStateChanged) onPressedStateChanged (true);
     }
 
@@ -51,10 +54,20 @@ public:
     {
         if (onPressedStateChanged) onPressedStateChanged (false);
         if (onClick && contains (e.getPosition()))
-            onClick (e.mods);
+        {
+            const int keep = juce::ModifierKeys::ctrlModifier | juce::ModifierKeys::commandModifier
+                           | juce::ModifierKeys::altModifier  | juce::ModifierKeys::shiftModifier
+                           | juce::ModifierKeys::popupMenuClickModifier;
+
+            const int flags = (e.mods.getRawFlags() | downMods.getRawFlags()
+                               | juce::ModifierKeys::getCurrentModifiers().getRawFlags()) & keep;
+
+            onClick (juce::ModifierKeys (flags));
+        }
     }
 
 private:
     std::vector<juce::Image> states;
     int currentIndex = 0;
+    juce::ModifierKeys downMods;
 };

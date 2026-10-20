@@ -93,7 +93,7 @@ void HarmonySingerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
     const bool fxOn = fxEnabledParam != nullptr && fxEnabledParam->get();
     fxMixGain.setTargetValue (fxOn ? 1.0f : 0.0f);
 
-    const float mix = mixInLParam != nullptr ? mixInLParam->get() : 0.5f;
+    const float mix = mixInLParam != nullptr ? mixInLParam->get() : 1.0f;
 
     float* outL = buffer.getWritePointer (0);
     float* outR = buffer.getWritePointer (1);
@@ -108,11 +108,12 @@ void HarmonySingerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
         const float delayedRef = refDelayForAlignment.popSample (0, refDelayForAlignment.getDelay(), true);
         refDelayForAlignment.pushSample (0, referenceScratch[static_cast<size_t> (i)]);
 
+        // MIX IN 1/L = crossfade murni: 0% = hanya suara asli mic (DO), 100% = hanya
+        // suara harmoni (MI / SOL ...) tanpa suara asli. Footswitch OFF -> m = 0 -> bypass
+        // (suara asli saja), jadi output tidak pernah senyap.
         const float fxGain = fxMixGain.getNextValue();
-        const float harmonySample = harmonyScratch[static_cast<size_t> (i)] * fxGain;
-
-        const float processedBus = delayedDry + harmonySample;
-        outL[i] = delayedDry * (1.0f - mix) + processedBus * mix;
+        const float m = mix * fxGain;
+        outL[i] = delayedDry * (1.0f - m) + harmonyScratch[static_cast<size_t> (i)] * m;
 
         outR[i] = delayedRef * refOutGain.getNextValue();
     }

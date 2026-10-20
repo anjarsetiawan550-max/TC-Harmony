@@ -194,6 +194,22 @@
     },
     "led_tone_red": {
       "info": "LED merah TONE sudah menyatu di dalam tombol: pakai tone_button_led_on / tone_button_led_off"
+    },
+    "led_refout": {
+      "file": "leds/led_refout_amber_(on|off).png",
+      "top_left": [
+        298,
+        400
+      ],
+      "size": [
+        64,
+        64
+      ],
+      "center": [
+        330.0,
+        432.0
+      ],
+      "info": "LED amber di kanan tulisan REF OUT: menyala saat REF OUT on (output 2/R aktif)"
     }
   }
 }

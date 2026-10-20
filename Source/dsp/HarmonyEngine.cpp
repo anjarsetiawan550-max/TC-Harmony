@@ -32,13 +32,18 @@ namespace
     }
 }
 
-void HarmonyEngine::prepare (double sampleRate, int maxBlockSize)
+void HarmonyEngine::prepare (double newSampleRate, int maxBlockSize)
 {
+    sampleRate = newSampleRate;
+
     pitchDetector.prepare (sampleRate, 1024);
     referencePitch.prepare (sampleRate, 1024);
 
-    voiceA.prepare (sampleRate, 1024);
-    voiceB.prepare (sampleRate, 1024);
+    // jendela YIN 1024 -> periode terpanjang < 512 sampel
+    voiceA.prepare (sampleRate, 512);
+    voiceB.prepare (sampleRate, 512);
+    voiceA.setExtraDelayMs (9.0f);   // sedikit "telat" dari suara asli, seperti penyanyi kedua
+    voiceB.setExtraDelayMs (15.0f);
 
     levelGain.reset (sampleRate, 0.02);
     levelGain.setCurrentAndTargetValue (0.6f);
@@ -62,6 +67,9 @@ void HarmonyEngine::reset()
     keyEstablished = false;
     keyRootPitchClass = 0;
     samplesSinceKeyUpdate = 0;
+    noteValid = false;
+    driftA = driftB = driftTargetA = driftTargetB = 0.0f;
+    driftCounter = 0;
 }
 
 void HarmonyEngine::setMode (int modeIndex) noexcept
@@ -74,6 +82,8 @@ void HarmonyEngine::setMode (int modeIndex) noexcept
     scaleStepsB = m.stepsB;
     fallbackSemitonesA = m.fallbackA;
     fallbackSemitonesB = m.fallbackB;
+    lastSemiA = static_cast<float> (m.fallbackA);
+    lastSemiB = static_cast<float> (m.fallbackB);
 }
 
 void HarmonyEngine::setLevel01 (float level01) noexcept
@@ -122,27 +132,37 @@ void HarmonyEngine::updateReverbParamsForType (int type)
     reverb.setParameters (reverbParams);
 }
 
-void HarmonyEngine::updateKeyEstimate (float referenceFreqHz, bool referenceVoiced)
+void HarmonyEngine::updateKeyEstimate (float referenceFreqHz, bool referenceVoiced,
+                                       float singerFreqHz, bool singerVoiced, int numSamples)
 {
-    if (referenceVoiced && referenceFreqHz > 0.0f)
+    // Lupa pelan (konstanta waktu ~tiap 512 sampel) supaya kunci bisa berpindah dalam puluhan detik.
+    const float decay = std::pow (0.9995f, static_cast<float> (numSamples) / 512.0f);
+    for (float& v : pitchClassHistogram) v *= decay;
+
+    auto addEvidence = [this] (float freqHz, float weight)
     {
-        const float midi = 69.0f + 12.0f * std::log2 (referenceFreqHz / 440.0f);
-        int pitchClass = ((static_cast<int> (std::lround (midi))) % 12 + 12) % 12;
+        const float midi = 69.0f + 12.0f * std::log2 (freqHz / 440.0f);
+        const int pitchClass = ((static_cast<int> (std::lround (midi))) % 12 + 12) % 12;
+        pitchClassHistogram[static_cast<size_t> (pitchClass)] += weight;
+    };
 
-        // slow exponential forgetting so the key estimate adapts over tens of seconds
-        for (float& v : pitchClassHistogram) v *= 0.9995f;
-        pitchClassHistogram[static_cast<size_t> (pitchClass)] += 1.0f;
-    }
+    // Gitar/referensi = bukti utama; melodi penyanyi sendiri = bukti tambahan
+    // (supaya tetap ada kunci walau input 2 kosong).
+    if (referenceVoiced && referenceFreqHz > 0.0f) addEvidence (referenceFreqHz, 1.0f);
+    if (singerVoiced && singerFreqHz > 0.0f)       addEvidence (singerFreqHz, 0.35f);
 
-    // Recompute best-fit major key roughly twice a second.
-    if (++samplesSinceKeyUpdate >= 22050)
+    // Hitung ulang kunci terbaik kira-kira dua kali per detik.
+    // (Perbaikan: sebelumnya penghitung ini naik 1 per BLOK bukan per sampel, sehingga
+    //  kunci baru terdeteksi setelah beberapa menit -> harmoni selalu jatuh ke interval tetap.)
+    samplesSinceKeyUpdate += numSamples;
+    if (samplesSinceKeyUpdate >= static_cast<int> (sampleRate * 0.5))
     {
         samplesSinceKeyUpdate = 0;
 
         float totalEnergy = 0.0f;
         for (float v : pitchClassHistogram) totalEnergy += v;
 
-        if (totalEnergy > 8.0f) // enough evidence accumulated to trust an estimate
+        if (totalEnergy > 8.0f) // cukup bukti untuk dipercaya
         {
             int bestRoot = keyRootPitchClass;
             float bestScore = -1.0f;
@@ -152,7 +172,7 @@ void HarmonyEngine::updateKeyEstimate (float referenceFreqHz, bool referenceVoic
                 for (int deg : kMajorScale)
                     score += pitchClassHistogram[static_cast<size_t> ((root + deg) % 12)];
 
-                // small bias to keep the previously-established key (hysteresis)
+                // sedikit bias untuk mempertahankan kunci sebelumnya (hysteresis)
                 if (root == keyRootPitchClass) score *= 1.08f;
 
                 if (score > bestScore) { bestScore = score; bestRoot = root; }
@@ -163,10 +183,9 @@ void HarmonyEngine::updateKeyEstimate (float referenceFreqHz, bool referenceVoic
     }
 }
 
-float HarmonyEngine::diatonicSemitoneOffset (float singerFreqHz, int scaleStepsOffset) const
+float HarmonyEngine::diatonicSemitoneOffset (int singerMidiNote, int scaleStepsOffset) const
 {
-    const float midi = 69.0f + 12.0f * std::log2 (singerFreqHz / 440.0f);
-    const int pitchClass = ((static_cast<int> (std::lround (midi))) % 12 + 12) % 12;
+    const int pitchClass = ((singerMidiNote % 12) + 12) % 12;
     const int relative = ((pitchClass - keyRootPitchClass) % 12 + 12) % 12;
 
     // find nearest major-scale degree to the singer's current pitch class
@@ -189,34 +208,74 @@ float HarmonyEngine::diatonicSemitoneOffset (float singerFreqHz, int scaleStepsO
 
 void HarmonyEngine::process (const float* dryVocal, const float* referenceInput, float* harmonyOut, int numSamples)
 {
-    // --- update pitch trackers & key estimate (block-rate internally hop-driven) ---
+    // --- update pitch trackers & key estimate ---
     pitchDetector.pushSamples (dryVocal, numSamples);
     referencePitch.pushSamples (referenceInput, numSamples);
-    updateKeyEstimate (referencePitch.getFrequencyHz(), referencePitch.isVoiced());
 
-    // --- decide this block's semitone offsets for each active voice ---
-    float semiA = static_cast<float> (fallbackSemitonesA);
-    float semiB = static_cast<float> (fallbackSemitonesB);
+    const float singerHz = pitchDetector.getFrequencyHz();
+    const bool singerVoiced = pitchDetector.isVoiced() && singerHz > 0.0f;
 
-    if (keyEstablished && pitchDetector.isVoiced() && pitchDetector.getFrequencyHz() > 0.0f)
+    updateKeyEstimate (referencePitch.getFrequencyHz(), referencePitch.isVoiced(),
+                       singerHz, singerVoiced, numSamples);
+
+    // --- nada penyanyi (dengan hysteresis) -> offset semitone tiap suara ---
+    if (singerVoiced)
     {
-        if (voiceAActive) semiA = diatonicSemitoneOffset (pitchDetector.getFrequencyHz(), scaleStepsA);
-        if (voiceBActive) semiB = diatonicSemitoneOffset (pitchDetector.getFrequencyHz(), scaleStepsB);
-    }
+        const float midi = 69.0f + 12.0f * std::log2 (singerHz / 440.0f);
+        if (! noteValid || std::abs (midi - static_cast<float> (trackedNote)) > 0.65f)
+        {
+            trackedNote = static_cast<int> (std::lround (midi));
+            noteValid = true;
+        }
 
-    voiceA.setPitchShiftSemitones (voiceAActive ? semiA : 0.0f);
-    voiceB.setPitchShiftSemitones (voiceBActive ? semiB : 0.0f);
+        if (keyEstablished)
+        {
+            if (voiceAActive) lastSemiA = diatonicSemitoneOffset (trackedNote, scaleStepsA);
+            if (voiceBActive) lastSemiB = diatonicSemitoneOffset (trackedNote, scaleStepsB);
+        }
+        else
+        {
+            lastSemiA = static_cast<float> (fallbackSemitonesA);
+            lastSemiB = static_cast<float> (fallbackSemitonesB);
+        }
+    }
+    // saat tak bernada offset terakhir dipertahankan (bagian itu memang tidak digeser)
+
+    voiceA.setPitchShiftSemitones (voiceAActive ? lastSemiA : 0.0f);
+    voiceB.setPitchShiftSemitones (voiceBActive ? lastSemiB : 0.0f);
+
+    // --- detune halus yang melayang pelan: dua "penyanyi" tidak pernah persis sama ---
+    driftCounter += numSamples;
+    if (driftCounter >= static_cast<int> (sampleRate * 0.15))
+    {
+        driftCounter = 0;
+        driftTargetA = (rng.nextFloat() * 2.0f - 1.0f) * 4.0f;   // +-4 sen
+        driftTargetB = (rng.nextFloat() * 2.0f - 1.0f) * 4.0f;
+    }
+    const float driftCoeff = 1.0f - std::exp (-static_cast<float> (numSamples) / (0.25f * static_cast<float> (sampleRate)));
+    driftA += driftCoeff * (driftTargetA - driftA);
+    driftB += driftCoeff * (driftTargetB - driftB);
+    voiceA.setDetuneCents (+6.0f + driftA);
+    voiceB.setDetuneCents (-6.0f + driftB);
+
+    // --- render ---
+    // Kedua suara selalu didorong & dirender (supaya penghitung waktunya tetap sinkron);
+    // yang tidak aktif cukup tidak diikutkan ke bus.
+    const float period = singerVoiced ? static_cast<float> (sampleRate / static_cast<double> (singerHz)) : 0.0f;
+    const float ampA = voiceAActive ? 1.0f : 0.0f;
+    const float ampB = voiceBActive ? 1.0f : 0.0f;
+    const float voiceNorm = (voiceAActive && voiceBActive) ? 0.72f : 1.0f; // dua suara -> turunkan sedikit
 
     for (int i = 0; i < numSamples; ++i)
     {
-        voiceA.pushDrySample (dryVocal[i]);
-        voiceB.pushDrySample (dryVocal[i]);
+        voiceA.pushDrySample (dryVocal[i], period);
+        voiceB.pushDrySample (dryVocal[i], period);
 
-        const float a = voiceAActive ? voiceA.renderOutputSample() : 0.0f;
-        const float b = voiceBActive ? voiceB.renderOutputSample() : 0.0f;
+        const float a = voiceA.renderOutputSample() * ampA;
+        const float b = voiceB.renderOutputSample() * ampB;
 
         const float g = levelGain.getNextValue();
-        harmonyOut[i] = (a + b) * g;
+        harmonyOut[i] = (a + b) * g * voiceNorm;
     }
 
     if (currentReverbType != 0)

@@ -26,4 +26,5 @@ namespace PedalLayout
 
     constexpr Rect ledStatusFx   { 308, 500, 64, 64 };
     constexpr Rect ledPower      { 508, 100, 64, 64 };
+    constexpr Rect ledRefOut     { 298, 400, 64, 64 };   // LED amber di kanan tulisan "REF OUT"
 }
