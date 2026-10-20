@@ -15,6 +15,8 @@ HarmonySingerAudioProcessor::HarmonySingerAudioProcessor()
     toneVoicingParam = dynamic_cast<juce::AudioParameterChoice*> (apvts.getParameter (ParamIDs::toneVoicing));
     fxEnabledParam   = dynamic_cast<juce::AudioParameterBool*>   (apvts.getParameter (ParamIDs::fxEnabled));
     refOutParam      = dynamic_cast<juce::AudioParameterBool*>   (apvts.getParameter (ParamIDs::refOut));
+    keyRootParam     = dynamic_cast<juce::AudioParameterChoice*> (apvts.getParameter (ParamIDs::keyRoot));
+    keyScaleParam    = dynamic_cast<juce::AudioParameterChoice*> (apvts.getParameter (ParamIDs::keyScale));
 }
 
 HarmonySingerAudioProcessor::~HarmonySingerAudioProcessor() = default;
@@ -80,6 +82,8 @@ void HarmonySingerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer
 
     // --- Harmony engine (reads dry vocal + reference, writes wet harmony bus) ---
     harmonyEngine.setMode (harmonyModeParam != nullptr ? harmonyModeParam->getIndex() : 0);
+    harmonyEngine.setManualKey (keyRootParam != nullptr ? keyRootParam->getIndex() - 1 : -1,   // 0 = Auto -> -1
+                                keyScaleParam != nullptr && keyScaleParam->getIndex() == 1);
     harmonyEngine.setLevel01 (levelParam != nullptr ? levelParam->get() : 0.6f);
     harmonyEngine.setReverbType (reverbTypeParam != nullptr ? reverbTypeParam->getIndex() : 1);
     harmonyEngine.process (dryVocalScratch.data(), referenceScratch.data(), harmonyScratch.data(), numSamples);

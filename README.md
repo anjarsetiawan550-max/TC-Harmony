@@ -71,6 +71,7 @@ Hasilnya ada di `build/HarmonySingerByLR_artefacts/Release/`.
 | **HARMONY** (8 posisi) | High / Higher / High & Higher / Low / Lower / Low & Lower / Higher & Lower / High & Low |
 | **LEVEL** | Volume keluaran suara harmoni |
 | **REVERB** (4 posisi) | Off / Room / Club / Hall |
+| **LED status (merah, di bawah TONE)** | Klik = menu **Harmony Key**: *Auto* (ikuti akor dari input 2, seperti TC-Helicon) atau key manual Major/Minor (C..B). Di bawah LED tampil keterangan kecil "CHORD Am7" / "KEY C major" yang sedang dipakai |
 | **MIX IN 1/L** | Crossfade di Output L: 0% = hanya suara asli mic, **100% = hanya suara harmoni (tanpa suara asli / tanpa nada "DO")**. Default 100%. Footswitch OFF = bypass (suara asli saja) |
 | **TONE** (tombol + LED merah) | Nyala/mati **Adaptive Tone** (EQ adaptif + Kompresor + De-esser + Noise-gate) pada vokal asli, bukan suara harmoni |
 | **Footswitch** | Nyala/mati efek harmoni (bypass) |
@@ -83,15 +84,19 @@ Hasilnya ada di `build/HarmonySingerByLR_artefacts/Release/`.
    terpisah, nada dari input referensi). Nada yang dipegang penyanyi
    dikunci dengan hysteresis, jadi vibrato tidak membuat interval harmoni
    loncat antara mayor/minor.
-2. Nada dari input referensi dipakai untuk menaksir **kunci (key)** lagu
-   secara statistik (histogram pitch-class yang meluruh perlahan; melodi
-   penyanyi ikut jadi bukti tambahan, jadi kunci tetap terbentuk walau
-   input 2 kosong), supaya
-   interval harmoni (3/4/5/6) jatuh pada nada yang *diatonically correct*
-   di kunci tersebut — bukan selalu interval kromatik tetap. Sebelum
-   kunci "terbentuk" (data belum cukup), engine memakai interval
-   kromatik standar (C mayor) sebagai fallback supaya efek tetap bisa
-   langsung dipakai.
+2. **Konteks musik dari input 2 (keyboard / gitar / musik)**. Urutan prioritas:
+   key manual (menu LED) → **akor terdeteksi** → key taksiran (histogram
+   pitch-class; melodi penyanyi ikut jadi bukti tambahan) → interval tetap.
+   Detektor akor (jendela 8192 sampel, energi nada C3..C6 → chroma →
+   template mayor, minor, 7, maj7, m7, dim) bekerja polifonik, jadi akor
+   penuh dari keyboard terbaca. Tangga nada mengikuti jenis akor
+   (mayor=Ionian, minor=Aeolian, 7=Mixolydian, m7=Dorian, dim=Locrian), dan
+   nada harmoni dikunci ke **nada akor** bila ada yang berjarak satu semitone
+   dari nada tangga nada. Akor baru harus menang dua jendela berturut-turut
+   (hysteresis) dan akor ditahan ~1.5 detik saat hening.
+   **Koreksi pitch:** simpangan menetap suara Anda dari kisi semitone
+   (sharp/flat) dihaluskan ~250 ms lalu dikurangkan dari pergeseran, jadi
+   harmoni tetap in tune walau suara agak fals, sementara vibrato tetap terbawa.
 3. **PSOLA pitch shifter** (pitch-synchronous overlap-add) menggeser
    nada vokal sesuai interval mode HARMONY. Tiap grain = 2 periode nada
    dan dikunci ke fase gelombang, lalu disusun ulang dengan jarak baru —
@@ -141,6 +146,7 @@ Source/
   dsp/
     YinPitchDetector.*          deteksi pitch (YIN)
     PsolaPitchShifter.*         pitch shifter PSOLA (formant terjaga)
+    ChordDetector.*             deteksi akor polifonik dari input 2
     HarmonyEngine.*             mode harmoni, estimasi kunci, reverb
     AdaptiveTone.*              noise-gate, EQ, compressor, de-esser
   gui/

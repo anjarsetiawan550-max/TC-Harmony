@@ -58,6 +58,7 @@ target_sources(HarmonySingerByLR
         Source/PluginEditor.cpp
         Source/dsp/YinPitchDetector.cpp
         Source/dsp/PsolaPitchShifter.cpp
+        Source/dsp/ChordDetector.cpp
         Source/dsp/HarmonyEngine.cpp
         Source/dsp/AdaptiveTone.cpp
 )

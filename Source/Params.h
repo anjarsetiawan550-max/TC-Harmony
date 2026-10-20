@@ -11,6 +11,8 @@ namespace ParamIDs
     inline constexpr const char* toneVoicing = "toneVoicing";
     inline constexpr const char* fxEnabled = "fxEnabled";
     inline constexpr const char* refOut = "refOut";
+    inline constexpr const char* keyRoot = "keyRoot";
+    inline constexpr const char* keyScale = "keyScale";
 }
 
 inline juce::StringArray harmonyModeNames()
@@ -22,6 +24,16 @@ inline juce::StringArray harmonyModeNames()
 inline juce::StringArray reverbTypeNames()
 {
     return { "Off", "Room", "Club", "Hall" };
+}
+
+inline juce::StringArray keyRootNames()
+{
+    return { "Auto", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+}
+
+inline juce::StringArray keyScaleNames()
+{
+    return { "Major", "Minor" };
 }
 
 inline juce::StringArray toneVoicingNames()
@@ -58,6 +70,13 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout
 
     params.push_back (std::make_unique<juce::AudioParameterBool> (
         juce::ParameterID { ParamIDs::refOut, 1 }, "Ref Out", true));
+
+    // Key manual: "Auto" = ikuti akor/key dari input 2 (seperti TC-Helicon)
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamIDs::keyRoot, 1 }, "Key", keyRootNames(), 0));
+
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (
+        juce::ParameterID { ParamIDs::keyScale, 1 }, "Scale", keyScaleNames(), 0));
 
     return { params.begin(), params.end() };
 }

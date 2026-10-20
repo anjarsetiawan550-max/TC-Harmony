@@ -61,6 +61,9 @@ public:
     std::atomic<float> detectedFrequencyHz { 0.0f };
     std::atomic<bool>  detectedVoiced { false };
 
+    // Konteks harmoni yang sedang dipakai (akor terdeteksi / key / key manual), untuk tampilan panel.
+    int getHarmonyDisplayCode() const noexcept { return harmonyEngine.getDisplayCode(); }
+
     // Footswitch (harmony FX) and Tone button both expose simple toggle methods
     // for the editor so clicks don't need to know parameter plumbing details.
     void toggleFxEnabled();
@@ -82,6 +85,8 @@ private:
     juce::AudioParameterChoice* toneVoicingParam = nullptr;
     juce::AudioParameterBool*   fxEnabledParam = nullptr;
     juce::AudioParameterBool*   refOutParam = nullptr;
+    juce::AudioParameterChoice* keyRootParam = nullptr;
+    juce::AudioParameterChoice* keyScaleParam = nullptr;
 
     juce::LinearSmoothedValue<float> refOutGain { 1.0f };
     juce::LinearSmoothedValue<float> fxMixGain { 1.0f }; // smooths footswitch on/off clicks

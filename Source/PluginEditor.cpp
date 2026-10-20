@@ -123,6 +123,8 @@ HarmonySingerAudioProcessorEditor::HarmonySingerAudioProcessorEditor (HarmonySin
     // --- LEDs ---
     ledStatusFx.addState (loadImg (BinaryData::led_status_red_off_png, BinaryData::led_status_red_off_pngSize)); // 0
     ledStatusFx.addState (loadImg (BinaryData::led_status_red_on_png,  BinaryData::led_status_red_on_pngSize));  // 1
+    // klik LED status = menu Key / Scale (Auto = ikuti akor dari input 2, seperti TC-Helicon)
+    ledStatusFx.onClick = [this] (const juce::ModifierKeys&) { showKeyMenu(); };
     addAndMakeVisible (ledStatusFx);
 
     ledPower.addState (loadImg (BinaryData::led_power_green_off_png, BinaryData::led_power_green_off_pngSize)); // 0
@@ -173,6 +175,20 @@ void HarmonySingerAudioProcessorEditor::paint (juce::Graphics& g)
 
     // pesan singkat (hilang sendiri setelah ~2 detik)
     const double remaining = overlayUntilMs - juce::Time::getMillisecondCounterHiRes();
+
+    // keterangan kecil di bawah LED status: akor / key yang sedang dipakai harmoni
+    if (remaining <= 0.0)
+    {
+        const juce::String ctx = describeContext (processor.getHarmonyDisplayCode());
+        if (ctx.isNotEmpty())
+        {
+            const float k = static_cast<float> (getWidth()) / static_cast<float> (PedalLayout::bgWidth);
+            g.setColour (juce::Colours::white.withAlpha (0.8f));
+            g.setFont (juce::Font (13.0f * k, juce::Font::bold));
+            g.drawText (ctx, juce::Rectangle<float> (230.0f * k, 568.0f * k, 220.0f * k, 22.0f * k),
+                        juce::Justification::centred, false);
+        }
+    }
     if (remaining > 0.0 && overlayText.isNotEmpty())
     {
         const float k = static_cast<float> (getWidth()) / static_cast<float> (PedalLayout::bgWidth);
@@ -185,6 +201,74 @@ void HarmonySingerAudioProcessorEditor::paint (juce::Graphics& g)
         g.setFont (juce::Font (14.0f * k, juce::Font::bold));
         g.drawText (overlayText, r, juce::Justification::centred, false);
     }
+}
+
+juce::String HarmonySingerAudioProcessorEditor::describeContext (int code)
+{
+    const int kind = code & 15;
+    if (kind == 0)
+        return {};
+
+    static const char* roots[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    static const char* chordSuffix[6] = { "", "m", "7", "maj7", "m7", "dim" };
+
+    const juce::String root = roots[(code >> 4) & 15];
+    const int quality = (code >> 8) & 15;
+
+    if (kind == 2) return "CHORD  " + root + chordSuffix[juce::jlimit (0, 5, quality)];
+    if (kind == 3) return "KEY  " + root + (quality == 1 ? " minor" : " major");
+    return "KEY  " + root + " (auto)";
+}
+
+void HarmonySingerAudioProcessorEditor::showKeyMenu()
+{
+    auto* rootParam  = dynamic_cast<juce::AudioParameterChoice*> (processor.apvts.getParameter (ParamIDs::keyRoot));
+    auto* scaleParam = dynamic_cast<juce::AudioParameterChoice*> (processor.apvts.getParameter (ParamIDs::keyScale));
+    if (rootParam == nullptr || scaleParam == nullptr)
+        return;
+
+    const int curRoot  = rootParam->getIndex();    // 0 = Auto, 1..12 = C..B
+    const int curScale = scaleParam->getIndex();   // 0 = Major, 1 = Minor
+    const auto names = keyRootNames();
+
+    juce::PopupMenu major, minor;
+    for (int i = 1; i <= 12; ++i)
+    {
+        major.addItem (100 + i, names[i], true, curRoot == i && curScale == 0);
+        minor.addItem (200 + i, names[i], true, curRoot == i && curScale == 1);
+    }
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader ("HARMONY KEY");
+    menu.addItem (1, "Auto (ikuti akor dari input 2)", true, curRoot == 0);
+    menu.addSubMenu ("Manual - Major", major);
+    menu.addSubMenu ("Manual - Minor", minor);
+
+    juce::Component::SafePointer<HarmonySingerAudioProcessorEditor> safeThis (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&ledStatusFx),
+                        [safeThis, rootParam, scaleParam, names] (int result)
+    {
+        if (result == 0 || safeThis == nullptr)
+            return;
+
+        int root = 0, scale = 0;
+        if (result >= 200)      { root = result - 200; scale = 1; }
+        else if (result >= 100) { root = result - 100; scale = 0; }
+
+        rootParam->beginChangeGesture();
+        rootParam->setValueNotifyingHost (rootParam->convertTo0to1 (static_cast<float> (root)));
+        rootParam->endChangeGesture();
+
+        if (root > 0)
+        {
+            scaleParam->beginChangeGesture();
+            scaleParam->setValueNotifyingHost (scaleParam->convertTo0to1 (static_cast<float> (scale)));
+            scaleParam->endChangeGesture();
+        }
+
+        safeThis->showOverlay (root == 0 ? juce::String ("KEY: AUTO")
+                                         : "KEY: " + names[root] + (scale == 1 ? " minor" : " major"));
+    });
 }
 
 void HarmonySingerAudioProcessorEditor::showOverlay (const juce::String& text)
@@ -218,6 +302,13 @@ void HarmonySingerAudioProcessorEditor::resized()
 void HarmonySingerAudioProcessorEditor::timerCallback()
 {
     refreshToggleVisuals();
+
+    const int code = processor.getHarmonyDisplayCode();
+    if (code != lastDisplayCode)
+    {
+        lastDisplayCode = code;
+        repaint();
+    }
 
     if (overlayUntilMs > 0.0)
     {

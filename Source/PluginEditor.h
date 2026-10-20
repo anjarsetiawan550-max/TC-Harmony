@@ -38,6 +38,9 @@ private:
 
     // pesan singkat di panel (mis. "TONE: LESS BRIGHT" setelah Ctrl + klik footswitch)
     void showOverlay (const juce::String& text);
+    void showKeyMenu();
+    static juce::String describeContext (int displayCode);
+    int lastDisplayCode = -1;
     juce::String overlayText;
     double overlayUntilMs = 0.0;
 
